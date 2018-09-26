@@ -135,11 +135,11 @@ def plot_report(subject_id=None):
 	return render_template('plot-tables.html', subject_id=subject_id, data=data)
 
 
-@app.route('/figdata/tac', methods = ['POST', 'GET'])
-@app.route('/<subject_id>/figdata/tac', methods = ['POST', 'GET'])
+@app.route('/figdata/tac')
+@app.route('/<subject_id>/figdata/tac')
 def tac_report(subject_id=None):
-	slice = request.args.get('slice') if request.method == 'GET' else request.form.get('slice')
-	frame = request.args.get('frame') if request.method == 'GET' else request.form.get('frame')
+	slice = request.args.get('slice')
+	frame = request.args.get('frame')
 	data = {}
 	for tab, img_type in [ ('time-integral', 'TAC3D'), ('time-series', 'TAC4D') ]: #'.gif') ]:
 		data[tab] = get_subject_data(DataType[img_type].name)

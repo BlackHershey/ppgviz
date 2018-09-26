@@ -11,28 +11,28 @@
     </div>
 </div>
 
-<form id='img-form' method='post' action='{{ url_for('tac_report', subject_id=subject_id, _anchor=image_type)}}'>
-    {% set start_slice = slice if slice else 65 %}
+<br/>
+<form id='img-form'>
+    {% set start_slice = slice if slice else 63 %}
     <div class='form-row'>
-        <label for='slice-counter' class='col-sm-1 offset-sm-1 control-label'>Slice #</label>
+        <label for='slice-counter' class='col-sm-1 control-label'>Slice #</label>
         <div class='col-sm-1'>
             <input type='range' class='form-control-range' id='slice-counter' name='slice'
-                min='1' max='127' value='{{start_slice}}'/>
+                min='1' max='127' value='{{start_slice}}' onchange='updateSlice("{{image_type}}", this.value)'/>
         </div>
+        <label class='control-label col-sm-1' id='current-slice' name='current-slice'>{{ start_slice }}</label>
     </div>
     {% if image_type == 'time-series' %}
-    {% set start_frame = frame if frame else 0 %}
-    <div class='form-row'>
-        <label for='frame-counter' class='col-sm-1 offset-sm-1 col-form-label'>Frame #</label>
-        <div class='col-sm-1'>
-            <input type='range' class='form-control-range' id='frame-counter' name='frame'
-                min='1' max='73' value='{{start_frame}}'/>
+        {% set start_frame = frame if frame else 1 %}
+        <div class='form-row'>
+            <label for='frame-counter' class='col-sm-1 control-label'>Frame #</label>
+            <div class='col-sm-1'>
+                <input type='range' class='form-control-range' id='frame-counter' name='frame'
+                    min='1' max='73' value='{{start_frame}}' onchange='updateFrame("{{image_type}}", this.value)'/>
+            </div>
+            <label class='control-label col-sm-1' id='current-frame' name='current-frame'>{{ start_frame }}</label>
         </div>
-    </div>
     {% endif %}
-    <div class='form-row'>
-        <input type='submit' class='btn btn-primary offset-sm-2' value='Submit'/>
-    </div>
 </form>
 <br/>
 
@@ -45,14 +45,10 @@
         {% for condition, item in row.data.items() %}
             <div class='col-md-3'>
                 {% if item %}
-                    {% if item.endswith('.4dfp.img') %}
-                        <img class='img-fluid horiz-align'
-                            src='{{ url_for('access_slice', filename=item, slice=slice, frame=frame) }}'
-                            data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
-                    {% else %}
-                        <img class='img-fluid horiz-align' src='{{ url_for('access_file', filename=item) }}'
-                            data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
-                    {% endif %}
+                    <img class='img-fluid horiz-align'
+                        id='{{image_type}}_{{row.subject}}_{{condition}}'
+                        src='{{ url_for('access_slice', filename=item, slice=slice, frame=frame) }}'
+                        data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
                 {% endif %}
             </div>
         {% endfor %}
@@ -74,20 +70,54 @@
 </div>
 
 <ul class='nav nav-tabs' role='tablist'>
-    {% for tab in ['Time integral', 'Time series'] %}
+    {% for tab in ['Time series', 'Time integral'] %}
         <li class='nav-item'>
-            <a class='nav-link {{ 'active' if tab == 'Time integral' }}' data-toggle='tab' href='#{{ '-'.join(tab.split()).lower() }}' role='tab'>{{ tab }}</a>
+            <a class='nav-link {{ 'active' if tab == 'Time series' }}' data-toggle='tab' href='#{{ '-'.join(tab.split()).lower() }}' role='tab'>{{ tab }}</a>
         </li>
     {% endfor %}
 </ul>
 
 <div class='tab-content'>
-    <div class='tab-pane fade show active' id='time-integral' role='tabpanel'>
-        {{ display_images('time-integral') }}
-    </div>
-    <div class='tab-pane fade' id='time-series' role='tabpanel'>
+    <div class='tab-pane fade show active' id='time-series' role='tabpanel'>
         {{ display_images('time-series') }}
     </div>
+    <div class='tab-pane fade' id='time-integral' role='tabpanel'>
+        {{ display_images('time-integral') }}
+    </div>
 </div>
+
+<script>
+    var data = JSON.parse('{{ data | tojson | safe }}');
+    var subject_id = '{{ subject_id if subject_id else '' }}';
+
+    function updateImages(image_type, options) {
+        var slice_str = options.hasOwnProperty('slice') ? 'slice=' + options.slice : '';
+        var frame_str = options.hasOwnProperty('frame') ? 'frame=' + options.frame : '';
+        for (var i = 0; i < data[image_type].length; i++) {
+            var row = data[image_type][i];
+            if (subject_id != '' && subject_id != row.subject){
+                continue;
+            }
+            for (var prop in row.data) {
+                var id = image_type + '_' + row.subject + '_' + prop;
+                var img = document.getElementById(id);
+                if (img != null) {
+                    img.src = '/imshow/' + row.data[prop] + '?' + slice_str + frame_str;
+                }
+            }
+        }
+    }
+
+    function updateSlice(image_type, slice) {
+        document.getElementById('current-slice').innerHTML = slice;
+        updateImages(image_type, {slice: slice});
+    }
+
+    function updateFrame(image_type, frame) {
+        document.getElementById('current-frame').innerHTML = frame;
+        updateImages(image_type, {frame: frame});
+    }
+
+</script>
 
 {% endblock %}
