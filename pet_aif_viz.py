@@ -161,7 +161,7 @@ def access_file(filename):
 def access_slice(filename):
 	imgdata = nb.load(os.path.join(app.config['PROJECT_FOLDER'], filename)).get_data()
 	slice = int(request.args.get('slice')) if request.args.get('slice') else imgdata.shape[2] // 2
-	frame = int(request.args.get('frame')) if request.args.get('frame') and imgdata.shape[3] > 1 else 0
+	frame = int(request.args.get('frame')) if request.args.get('frame') and imgdata.shape[3] > 1 else 1
 
 	# cap values at max values to prevent indexing errors
 	slice = min(slice, imgdata.shape[2])-1
