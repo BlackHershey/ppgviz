@@ -13,12 +13,12 @@
 
 <br/>
 <form id='img-form'>
-    {% set start_slice = slice if slice else 63 %}
+    {% set start_slice = slice if slice else max_slice // 2 %}
     <div class='form-row'>
         <label for='slice-counter' class='col-sm-1 control-label'>Slice #</label>
         <div class='col-sm-1'>
             <input type='range' class='form-control-range' id='slice-counter' name='slice'
-                min='1' max='127' value='{{start_slice}}' onchange='updateSlice("{{image_type}}", this.value)'/>
+                min='1' max='{{max_slice}}' value='{{start_slice}}' onchange='updateSlice("{{image_type}}", this.value)'/>
         </div>
         <label class='control-label col-sm-1' id='current-slice' name='current-slice'>{{ start_slice }}</label>
     </div>
@@ -28,7 +28,7 @@
             <label for='frame-counter' class='col-sm-1 control-label'>Frame #</label>
             <div class='col-sm-1'>
                 <input type='range' class='form-control-range' id='frame-counter' name='frame'
-                    min='1' max='73' value='{{start_frame}}' onchange='updateFrame("{{image_type}}", this.value)'/>
+                    min='1' max='{{max_frame}}' value='{{start_frame}}' onchange='updateFrame("{{image_type}}", this.value)'/>
             </div>
             <label class='control-label col-sm-1' id='current-frame' name='current-frame'>{{ start_frame }}</label>
         </div>

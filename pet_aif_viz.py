@@ -141,9 +141,14 @@ def tac_report(subject_id=None):
 	slice = request.args.get('slice')
 	frame = request.args.get('frame')
 	data = {}
-	for tab, img_type in [ ('time-integral', 'TAC3D'), ('time-series', 'TAC4D') ]: #'.gif') ]:
+	for tab, img_type in [ ('time-integral', 'TAC3D'), ('time-series', 'TAC4D') ]:
 		data[tab] = get_subject_data(DataType[img_type].name)
-	return render_template('view-images.html', subject_id=subject_id, data=data, slice=slice, frame=frame)
+		if img_type == 'TAC4D':
+			sample_4dimg = os.path.join(app.config['PROJECT_FOLDER'], data[tab][0]['data']['basal'])
+			max_slice, max_frame = nb.load(sample_4dimg).get_data().shape[2:]
+
+	return render_template('view-images.html', subject_id=subject_id, data=data, max_slice=max_slice, max_frame=max_frame, slice=slice,
+		frame=frame)
 
 
 @app.route('/figdata/aif')
