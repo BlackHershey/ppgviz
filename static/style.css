@@ -1,0 +1,46 @@
+.control-label {
+    margin-top:auto;
+}
+
+footer {
+    padding-top: 20px;
+}
+
+.form-row {
+    margin-bottom: 5px;
+}
+
+.grid-container {
+    margin: auto;
+    width: 95%;
+}
+
+.horiz-align {
+    display: block;
+    margin: auto;
+}
+
+.nav-button {
+    margin: 10px 10px 10px 0px;
+}
+
+.nav-form {
+    margin-left: auto;
+}
+
+.title {
+    text-align: center;
+}
+
+ /* taken from stack overflow (https://stackoverflow.com/a/18537908) */
+.bodycontainer {
+    max-height: 450px;
+    width: 100%;
+    margin: 0;
+    overflow-y: auto;
+}
+
+.table-scrollable {
+    margin: 0;
+    padding: 0;
+}

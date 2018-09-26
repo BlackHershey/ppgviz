@@ -1,0 +1,13 @@
+<!-- Optionally shown 'Clear subject filter' button -->
+{% macro conditional_clear_btn(route, subject_id) %}
+{% if subject_id %}
+<a class='btn btn-outline-secondary nav-button' href='{{ url_for(route, subject_id=None) }}'>Clear subject filter</a>
+{% endif %}
+{% endmacro %}
+
+<!--  Make subject column clickable to filter on that subject -->
+{% macro subject_link(route, subject) %}
+<div class='col-md-1 title'>
+    <a href='{{ url_for(route, subject_id=subject) }}'>{{ subject }}</a>
+</div>
+{% endmacro %}

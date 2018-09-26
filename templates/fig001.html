@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% set route = 'fig_report' %}
+
+{% block content %}
+
+<div class='row'>
+    <div class='col-md-12'>
+        <nav class='breadcrumb'>
+          <span class='breadcrumb-item active'>Combined plots</span>
+        </nav>
+    </div>
+</div>
+
+<div class='container' style='padding-bottom:10px;'>
+    <div class='row'>
+        <div class='col-md-2'></div>
+        <div class='col-md-8'>
+            <canvas id='masterGraph'></canvas>
+        </div>
+        <div class='col-md-2'></div>
+    </div>
+</div>
+
+<div class='row'>
+    <div class='nav-form'>
+        {{ shared.conditional_clear_btn(route, subject_id) }}
+        <a class='btn btn-outline-primary nav-button' href='{{ url_for('plot_report', subject_id=subject_id) }}'>View plot tables</a>
+    </div>
+</div>
+
+{% include 'header.html' %}
+
+{% for row in data | sort(attribute='subject') %}
+    {% if not subject_id or row.subject == subject_id %}
+    <hr/>
+    <div class='row'>
+        {{ shared.subject_link(route, row.subject) }}
+        {% for condition, filename in row.data.items() %}
+            <div class='col-md-3'>
+                {% if filename %}
+                <img class='img-fluid' src='{{ url_for('access_file', filename=filename) }}'
+                    data-toggle='popover' data-placement='top' data-content='{{ filename }}'/>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endfor %}
+
+
+<script>
+    var data = JSON.parse('{{ data | tojson | safe }}');
+    var scatterData = JSON.parse('{{ plotData | tojson | safe }}');
+
+    var ctx = document.getElementById('masterGraph').getContext('2d');
+    var masterGraph = Chart.Scatter(ctx, {
+        data: scatterData,
+        options: {
+            animation: false,
+            legend: {
+                position: 'right'
+            },
+            scales: {
+                xAxes: [{
+                    scaleLabel: { display: true, labelString: 'AIF Counts', exponent: true },
+                    ticks: {
+                        callback: function(label, index, labels) {
+                            return label.toExponential(1);
+                        }
+                    }
+                }],
+                yAxes: [{
+                    scaleLabel: { display: true, labelString: 'PET activity', exponent: true },
+                    ticks: {
+                        callback: function(label, index, labels) {
+                            return label.toExponential(1);
+                        }
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                        return point.subject + ': ' + tooltipItem.xLabel.toExponential(1) + ', ' + tooltipItem.yLabel.toExponential(1);
+                    }
+                }
+            }
+        }
+    });
+
+    document.getElementById('masterGraph').onclick = function(evt) {
+        var point = masterGraph.getElementAtEvent(evt)[0]
+        if (point) {
+            var pointData = scatterData.datasets[point._datasetIndex].data[point._index];
+            console.log(pointData)
+            var idx = data.findIndex(x => x.subject == pointData.subject);
+            console.log(data[idx])
+            window.location.replace('{{ url_for('fig_report') }}' + data[idx].subject)
+        }
+    };
+
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% set route = 'plot_report' %}
+<!--  Create a macro to iterate through data object and display grid of tables -->
+{% macro grid_table(tab) %}
+
+<div class='row'>
+    <div class='nav-form'>
+        {{ shared.conditional_clear_btn(route, subject_id) }}
+        {% set target = '_'.join([tab, 'report']) %}
+        {% set button_txt = 'View images' if tab=='tac' else 'View measurements' %}
+        <a class='btn btn-outline-primary nav-button' href='{{ url_for(target, subject_id=subject_id) }}'>{{ button_txt }}</a>
+    </div>
+</div>
+
+<form id='plot-form' method='get' target='_new' action='{{ url_for('gen_plot') }}'>
+    <div class='form-row'>
+        <input type='hidden' name='data_type' value='{{tab}}' />
+        {% if subject_id %}
+            <input type='hidden' name='subject' value='{{subject_id}}' />
+        {% else %}
+            <label for='subject' class='col-sm-1 control-label'>Subject:</label>
+            <select name='subject' id='sub-select' class='form-control col-sm-1'>
+                {% for row in data[tab.upper()] | sort(attribute='subject') %}
+                <option value='{{row.subject}}'>{{row.subject}}</option>
+                {% endfor %}
+            </select>
+        {% endif %}
+	</div>
+	<div class='form-row'>
+        <label for='condition' class='col-sm-1 control-label'>Condition:</label>
+        <select name='condition' id='cond-select' class='form-control col-sm-1'>
+            {% for condition in ['all', 'basal', 'hypergly', 'hyperins'] %}
+            <option value='{{condition}}'>{{condition}}</option>
+            {% endfor %}
+        </select>
+	</div>
+	<div class='form-row'>
+        <div class='col-sm-1 offset-sm-1'>
+            <input type='submit' class='btn btn-primary' id='plot-btn' value='Plot'/>
+        </div>
+    </div>
+</form>
+<br/>
+
+{% include 'header.html' %}
+
+{% for row in data[tab.upper()] | sort(attribute='subject') %}
+    {% if not subject_id or row.subject == subject_id %}
+    <hr/>
+    <div class='row'>
+        {{ shared.subject_link(route, row.subject) }}
+        {% for condition, data in row.data.items() %}
+            <div class='col-md-3'>
+                <div class='bodycontainer scrollable' data-toggle='popover' data-placement='top' data-content='{{ data.source }}'>
+                    {{ data.table_html | safe }}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% block content %}
+
+<div class='row'>
+    <div class='col-md-12'>
+        <nav class='breadcrumb'>
+          <a class='breadcrumb-item' href='{{ url_for('fig_report', subject_id=subject_id) }}'>Combined plots</a>
+          <span class='breadcrumb-item active'>Data tables</span>
+        </nav>
+    </div>
+</div>
+
+<ul class='nav nav-tabs' role='tablist'>
+    {% for tab in ['TAC', 'AIF'] %}
+        <li class='nav-item'>
+            <a class='nav-link {{ 'active' if tab == 'TAC' }}' data-toggle='tab' href='#{{ tab.lower() }}' role='tab'>{{ tab }}</a>
+        </li>
+    {% endfor %}
+</ul>
+
+<div class='tab-content'>
+    <div class='tab-pane fade show active' id='tac' role='tabpanel'>
+        {{ grid_table('tac') }}
+    </div>
+    <div class='tab-pane fade' id='aif' role='tabpanel'>
+        {{ grid_table('aif') }}
+    </div>
+</div>
+
+{% endblock %}

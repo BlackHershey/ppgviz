@@ -1,0 +1,11 @@
+<br/>
+{% include "header.html" %}
+{% for row in data %}
+<hr/>
+<div class="row">
+    <div class="col-md-1 center">{{ subject }}</div>
+    {% for condition, table in tables.items() %}
+    <div class="col-md-3 bodycontainer scrollable">{{ table | safe }}</div>
+    {% endfor %}
+</div>
+{% endfor %}
