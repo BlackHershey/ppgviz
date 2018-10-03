@@ -6,7 +6,7 @@
 
 <div class='row'>
     <div class='nav-form'>
-        {{ shared.conditional_clear_btn(route, subject_id) }}
+        {{ shared.conditional_clear_btn(route, subject_id, tab) }}
         {% set target = '_'.join([tab, 'report']) %}
         {% set button_txt = 'View images' if tab=='tac' else 'View measurements' %}
         <a class='btn btn-outline-primary nav-button' href='{{ url_for(target, subject_id=subject_id) }}'>{{ button_txt }}</a>
@@ -49,7 +49,7 @@
     {% if not subject_id or row.subject == subject_id %}
     <hr/>
     <div class='row'>
-        {{ shared.subject_link(route, row.subject) }}
+        {{ shared.subject_link(route, row.subject, tab) }}
         {% for condition, data in row.data.items() %}
             <div class='col-md-3'>
                 <div class='bodycontainer scrollable' data-toggle='popover' data-placement='top' data-content='{{ data.source }}'>
