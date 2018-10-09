@@ -6,16 +6,17 @@
 
 <div class='row'>
     <div class='nav-form'>
-        {{ shared.conditional_clear_btn(route, subject_id, tab) }}
+        {{ shared.conditional_clear_btn(route, tracer, subject_id, tab) }}
         {% set target = '_'.join([tab, 'report']) %}
         {% set button_txt = 'View images' if tab=='tac' else 'View measurements' %}
-        <a class='btn btn-outline-primary nav-button' href='{{ url_for(target, subject_id=subject_id) }}'>{{ button_txt }}</a>
+        <a class='btn btn-primary nav-button' href='{{ url_for(target, tracer=tracer, subject_id=subject_id) }}'>{{ button_txt }}</a>
     </div>
 </div>
 
 <form id='plot-form' method='get' target='_new' action='{{ url_for('gen_plot') }}'>
     <div class='form-row'>
         <input type='hidden' name='data_type' value='{{tab}}' />
+        <input type='hidden' name='tracer' value='{{tracer}}' />
         {% if subject_id %}
             <input type='hidden' name='subject' value='{{subject_id}}' />
         {% else %}
@@ -47,19 +48,25 @@
 
 {% for row in data[tab.upper()] | sort(attribute='subject') %}
     {% if not subject_id or row.subject == subject_id %}
-    <hr/>
-    <div class='row'>
-        {{ shared.subject_link(route, row.subject, tab) }}
-        {% for condition, data in row.data.items() %}
+        <hr/>
+        {% for i in range(max_length) %}
+        <div class='row'>
+            {{ shared.subject_link(route, i == 0, tracer, row.subject) }}
+            {% for condition in row.data.keys() %}
             <div class='col-md-3'>
-                <div class='bodycontainer scrollable' data-toggle='popover' data-placement='top' data-content='{{ data.source }}'>
-                    {{ data.table_html | safe }}
-                </div>
+                {% set data = row.data[condition][i] %}
+                {% if data %}
+                    <div class='bodycontainer scrollable' data-toggle='popover' data-placement='top' data-content='{{ data.source }}'>
+                        {{ data.table_html | safe }}
+                    </div>
+                {% endif %}
             </div>
+            {% endfor %}
+        </div>
         {% endfor %}
-    </div>
     {% endif %}
 {% endfor %}
+
 {% endmacro %}
 
 {% block content %}
@@ -67,11 +74,13 @@
 <div class='row'>
     <div class='col-md-12'>
         <nav class='breadcrumb'>
-          <a class='breadcrumb-item' href='{{ url_for('fig_report', subject_id=subject_id) }}'>Combined plots</a>
+          <a class='breadcrumb-item' href='{{ url_for('fig_report', tracer=tracer, subject_id=subject_id) }}'>Combined plots</a>
           <span class='breadcrumb-item active'>Data tables</span>
         </nav>
     </div>
 </div>
+
+{{ shared.report_header(tracer) }}
 
 <ul class='nav nav-tabs' role='tablist'>
     {% for tab in ['TAC', 'AIF'] %}

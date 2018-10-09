@@ -12,6 +12,39 @@
     </div>
 </div>
 
+<!-- <div class='tracer-form' method='post' action=''>
+    <div class='form-row'>
+        <div class='col-sm-1'>
+            <select name='tracer' id='tracer-select' class='form-control col-sm-1' onchange='filterTracer(this.value)'>
+                <option value='{{tracer}}'>{{tracer}}</option>
+            </select>
+        </div>
+    </div>
+    <div class='form-row'>
+        <div class='col-sm-1 offset-sm-1'>
+            <input type='submit' class='btn btn-primary' id='plot-btn' value='Show'/>
+        </div>
+    </div>
+</div> -->
+
+<div class='row'>
+    {{ shared.report_header(tracer) }}
+    <div class='nav-form btn-group' role='group'>
+        {{ shared.conditional_clear_btn(route, tracer, subject_id) }}
+        <div class='dropdown'>
+            <a class='btn btn-secondary nav-button dropdown-toggle' href='#' role='button' id='select-tracer' data-toggle='dropdown'>
+                Select tracer
+            </a>
+            <div class='dropdown-menu'>
+                {% for tracer in ['fdg', 'ho', 'oc', 'oo'] %}
+                    <a class='dropdown-item' href='{{ url_for(route, tracer=tracer, subject_id=subject_id) }}'>{{tracer}}</a>
+                {% endfor %}
+            </div>
+        </div>
+        <a class='btn btn-primary nav-button' href='{{ url_for('plot_report', tracer=tracer, subject_id=subject_id) }}'>View plot tables</a>
+    </div>
+</div>
+
 <div class='container' style='padding-bottom:10px;'>
     <div class='row'>
         <div class='col-md-2'></div>
@@ -22,32 +55,29 @@
     </div>
 </div>
 
-<div class='row'>
-    <div class='nav-form'>
-        {{ shared.conditional_clear_btn(route, subject_id) }}
-        <a class='btn btn-outline-primary nav-button' href='{{ url_for('plot_report', subject_id=subject_id) }}'>View plot tables</a>
-    </div>
-</div>
 
 {% include 'header.html' %}
 
+
 {% for row in data | sort(attribute='subject') %}
     {% if not subject_id or row.subject == subject_id %}
-    <hr/>
-    <div class='row'>
-        {{ shared.subject_link(route, row.subject) }}
-        {% for condition, filename in row.data.items() %}
+        <hr/>
+        {% for i in range(max_length) %}
+        <div class='row'>
+            {{ shared.subject_link(route, i == 0, tracer, row.subject) }}
+            {% for condition in row.data.keys() %}
             <div class='col-md-3'>
+                {% set filename = row.data[condition][i] %}
                 {% if filename %}
-                <img class='img-fluid' src='{{ url_for('access_file', filename=filename) }}'
-                    data-toggle='popover' data-placement='top' data-content='{{ filename }}'/>
+                    <img class='img-fluid' src='{{ url_for('access_file', filename=filename) }}'
+                        data-toggle='popover' data-placement='top' data-content='{{ filename }}'/>
                 {% endif %}
             </div>
+            {% endfor %}
+        </div>
         {% endfor %}
-    </div>
     {% endif %}
 {% endfor %}
-
 
 <script>
     var data = JSON.parse('{{ data | tojson | safe }}');
@@ -94,10 +124,11 @@
         var point = masterGraph.getElementAtEvent(evt)[0]
         if (point) {
             var pointData = scatterData.datasets[point._datasetIndex].data[point._index];
-            console.log(pointData)
+            console.log(pointData);
             var idx = data.findIndex(x => x.subject == pointData.subject);
-            console.log(data[idx])
-            window.location.replace('{{ url_for('fig_report') }}' + data[idx].subject)
+            console.log(data[idx]);
+            var tracer = '{{tracer}}';
+            window.location.replace('{{ url_for('fig_report', tracer=tracer) }}/' + data[idx].subject)
         }
     };
 

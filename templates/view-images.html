@@ -7,7 +7,7 @@
 
 <div class='row'>
     <div class='nav-form'>
-        {{ shared.conditional_clear_btn(route, subject_id, image_type) }}
+        {{ shared.conditional_clear_btn(route, tracer, subject_id, image_type) }}
     </div>
 </div>
 
@@ -36,25 +36,31 @@
 </form>
 <br/>
 
+
 {% include 'header.html' %}
+
 {% for row in data[image_type] | sort(attribute='subject') %}
     {% if not subject_id or row.subject == subject_id %}
-    <hr/>
-    <div class='row'>
-        {{ shared.subject_link(route, row.subject, image_type) }}
-        {% for condition, item in row.data.items() %}
+        <hr/>
+        {% for i in range(max_length) %}
+        <div class='row'>
+            {{ shared.subject_link(route, i == 0, tracer, row.subject) }}
+            {% for condition in row.data.keys() %}
             <div class='col-md-3'>
+                {% set item = row.data[condition][i] %}
                 {% if item %}
                     <img class='img-fluid horiz-align'
-                        id='{{image_type}}_{{row.subject}}_{{condition}}'
+                        id='{{image_type}}_{{row.subject}}_{{condition}}{{i}}'
                         src='{{ url_for('access_slice', filename=item, slice=slice, frame=frame) }}'
                         data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
                 {% endif %}
             </div>
+            {% endfor %}
+        </div>
         {% endfor %}
-    </div>
     {% endif %}
 {% endfor %}
+
 {% endmacro %}
 
 {% block content %}
@@ -62,12 +68,14 @@
 <div class='row'>
     <div class='col-md-12'>
         <nav class='breadcrumb'>
-          <a class='breadcrumb-item' href='{{ url_for('fig_report', subject_id=subject_id) }}'>Combined plots</a>
-          <a class='breadcrumb-item' href='{{ url_for('plot_report', subject_id=subject_id) }}'>Data tables</a>
+          <a class='breadcrumb-item' href='{{ url_for('fig_report', tracer=tracer, subject_id=subject_id) }}'>Combined plots</a>
+          <a class='breadcrumb-item' href='{{ url_for('plot_report', tracer=tracer, subject_id=subject_id) }}'>Data tables</a>
           <span class='breadcrumb-item active'>TAC images</span>
         </nav>
     </div>
 </div>
+
+{{ shared.report_header(tracer) }}
 
 <ul class='nav nav-tabs' role='tablist'>
     {% for tab in ['Time series', 'Time integral'] %}
@@ -89,20 +97,26 @@
 <script>
     var data = JSON.parse('{{ data | tojson | safe }}');
     var subject_id = '{{ subject_id if subject_id else '' }}';
+    var max_length = '{{ max_length }}';
 
-    function updateImages(image_type, options) {
-        var slice_str = options.hasOwnProperty('slice') ? 'slice=' + options.slice : '';
-        var frame_str = options.hasOwnProperty('frame') ? 'frame=' + options.frame : '';
+    function updateImages(image_type, slice, frame) {
+        var slice = document.getElementById(image_type + '-slice-counter').value;
+        var frame = document.getElementById('time-series-frame-counter').value;
+
+        // var slice_str = options.hasOwnProperty('slice') ? 'slice=' + options.slice : '';
+        // var frame_str = options.hasOwnProperty('frame') ? 'frame=' + options.frame : '';
         for (var i = 0; i < data[image_type].length; i++) {
             var row = data[image_type][i];
             if (subject_id != '' && subject_id != row.subject){
                 continue;
             }
-            for (var prop in row.data) {
-                var id = image_type + '_' + row.subject + '_' + prop;
-                var img = document.getElementById(id);
-                if (img != null) {
-                    img.src = '/imshow/' + row.data[prop] + '?' + slice_str + frame_str;
+            for (var j = 0; j < max_length; j++){
+                for (var prop in row.data) {
+                    var id = image_type + '_' + row.subject + '_' + prop + j;
+                    var img = document.getElementById(id);
+                    if (img != null) {
+                        img.src = '/imshow/' + row.data[prop][j] + '?slice=' + slice + '&frame=' + frame;
+                    }
                 }
             }
         }
@@ -110,12 +124,12 @@
 
     function updateSlice(image_type, slice) {
         document.getElementById(image_type + '-current-slice').innerHTML = slice;
-        updateImages(image_type, {slice: slice});
+        updateImages(image_type);
     }
 
     function updateFrame(image_type, frame) {
         document.getElementById('current-frame').innerHTML = frame;
-        updateImages(image_type, {frame: frame});
+        updateImages(image_type);
     }
 
 </script>

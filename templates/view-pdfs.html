@@ -7,8 +7,8 @@
 <div class='row'>
     <div class='col-md-12'>
         <nav class='breadcrumb'>
-          <a class='breadcrumb-item' href='{{ url_for('fig_report', subject_id=subject_id) }}'>Combined plots</a>
-          <a class='breadcrumb-item' href='{{ url_for('plot_report', subject_id=subject_id, _anchor='aif') }}'>Data tables</a>
+          <a class='breadcrumb-item' href='{{ url_for('fig_report', tracer=tracer, subject_id=subject_id) }}'>Combined plots</a>
+          <a class='breadcrumb-item' href='{{ url_for('plot_report', tracer=tracer, subject_id=subject_id, _anchor='aif') }}'>Data tables</a>
           <span class='breadcrumb-item active'>Rad Measurements</span>
         </nav>
     </div>
@@ -17,7 +17,7 @@
 <br/>
 <div class='row'>
     <div class='nav-form'>
-        {{ shared.conditional_clear_btn(route, subject_id) }}
+        {{ shared.conditional_clear_btn(route, tracer, subject_id) }}
     </div>
 </div>
 
