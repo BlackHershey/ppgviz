@@ -216,7 +216,10 @@ def gen_plot():
 	condition = request.args.get('condition')
 	tracer = request.args.get('tracer')
 
-	fig, ax = plt.subplots()
+	fig = plt.figure()
+	ax1 = fig.add_subplot(111)
+	ax2 = plt.axes([0.65, 0.45, .2, .2])
+
 	conditions = list(subject_map[subject].keys()) if condition == 'all' else [ condition ]
 	conditions.sort()
 	legend = []
@@ -224,15 +227,19 @@ def gen_plot():
 		filenames = glob(os.path.join(app.config['PROJECT_FOLDER'], get_filename(data_type, subject, condition, tracer)))
 		for filename in filenames:
 			x, y = np.genfromtxt(filename, delimiter=',', skip_header=1, unpack=True)
-			ax.plot(x,y)
+			ax1.plot(x,y)
+			ax2.plot(x[:14], y[:14]) # create zoomed in plot of first 120 seconds
+
 			run = re.search('_([a-z]+(\d?))v\dr\d.csv$', filename).groups()[-1]
 			legend.append(condition + ('-' + run if run else ''))
 
-	print('l=', legend)
-	ax.set_title('{} {} for {}'.format(tracer.upper(), data_type.upper(), subject))
-	ax.set_xlabel('Time (s)')
-	ax.set_ylabel('Specific activity')
-	plt.legend(legend)
+	ax1.set_title('{} {} for {}'.format(tracer.upper(), data_type.upper(), subject))
+	ax1.set_xlabel('Time (s)')
+	ax1.set_ylabel('Specific activity')
+	ax1.legend(legend)
+
+	if tracer != 'fdg':
+		fig.delaxes(ax2) # only need zoomed in plot for long timecourses
 
 	plot = BytesIO()
 	fig.savefig(plot)
