@@ -88,9 +88,9 @@ def get_filename(data_type, subject, condition, tracer):
 		plot_suffix = 'Caprac' if tracer == 'fdg' else 'Aif'
 		filename_template = '{0}/Vall/mlsiemens_Herscovitch1985_plot' + plot_suffix + '_{1}{2}v{3}r1_{1}{2}v{3}r1.csv'
 	elif data_type == DataType.TAC3D.name:
-		filename_template = '{0}/Vall/{1}{2}v{3}r1_sumt.4dfp.img'
+		filename_template = '{0}/Vall/{1}{2}v{3}r1_sumt_on_fdg.4dfp.img'
 	elif data_type == DataType.TAC4D.name:
-		filename_template = '{0}/Vall/{1}{2}v{3}r1.4dfp.img'
+		filename_template = '{0}/Vall/{1}{2}v{3}r1_op_{1}v1r1_on_op_fdgv1r1.4dfp.img'
 
 	return filename_template.format(subject, tracer, tracer_match_suffix, visit_id) if filename_template else ''
 
