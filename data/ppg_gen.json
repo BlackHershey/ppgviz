@@ -1,0 +1,42 @@
+{
+    "project_folder": "P:\\",
+    "datasets": [ "fdg", "oo", "oc", "ho" ],
+    "filepaths": [
+        {
+            "id": "Combined Plots",
+            "tab": null,
+            "templates": [
+                "{subject}/Vall/fig_mlsiemens_Herscovitch1985_constructTracerState_{dataset}*v{session}r1/001.png"
+            ]
+        },
+        {
+            "id": "Data tables",
+            "tab": "TAC",
+            "templates": [
+                "{subject}/Vall/mlsiemens_Herscovitch1985_plotScannerWholebrain_{dataset}*v{session}r1_{dataset}*v{session}r1.csv"
+            ]
+        },
+        {
+            "id": "Data tables",
+            "tab": "AIF",
+            "templates": [
+                "{subject}/Vall/mlsiemens_Herscovitch1985_plotCaprac_{dataset}*v{session}r1_{dataset}*v{session}r1.csv",
+                "{subject}/Vall/mlsiemens_Herscovitch1985_plotAif_{dataset}*v{session}r1_{dataset}*v{session}r1.csv"
+            ]
+        },
+        {
+            "id": "PET Images",
+            "tab": "Time integral",
+            "templates": [
+                "{subject}/Vall/{dataset}*v{session}r1_sumt_on_fdg.4dfp.img"
+            ]
+        },
+        {
+            "id": "PET Images",
+            "tab": "Time series",
+            "templates": [
+                "{subject}/Vall/{dataset}*v{session}r1_op_{dataset}v1r1_on_op_fdgv1r1.4dfp.img"
+            ]
+        }
+    ]
+}

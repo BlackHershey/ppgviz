@@ -24,12 +24,23 @@ class DataType(Enum):
 	TAC3D = 4
 	TAC4D = 5
 
+DATATYPES = {
+	"FIG": ("Combined Plots", None),
+	"TAC": ("Data tables", "TAC"),
+	"AIF": ("Data tables", "AIF"),
+	"TAC3D": ("PET Images", "Time integral"),
+	"TAC4D": ("PET Images", "Time series")
+}
+
 SUBJECT_ID = 'PET.Subject.Id'
 VISIT_ID = 'PET.Visit.Id'
 SESSION_DATE = 'Session.Date'
 
+with open('data/ppg_gen.json') as f:
+	data_config = json.load(f)
+
 app = Flask(__name__)
-app.config['PROJECT_FOLDER'] = '/data/nil-bluearc/raichle/PPGdata/jjlee2'
+app.config['PROJECT_FOLDER'] = data_config['project_folder']
 
 df = pd.read_excel('static/ppg_id_map.xlsx', sheet_name='id_map', usecols=[0,7,8,9])
 df[SESSION_DATE] = pd.to_datetime(df[SESSION_DATE])
@@ -77,27 +88,15 @@ def get_plotdata(tracer, subject_id=None):
 
 def get_filename(data_type, subject, condition, tracer):
 	visit_id = subject_map[subject][condition]
-	tracer_match_suffix = '' if tracer =='fdg' else '?'
 
-	data_type = data_type.upper()
-	if data_type == DataType.FIG.name:
-		filename_template = '{0}/Vall/fig_mlsiemens_Herscovitch1985_constructTracerState_{1}{2}v{3}r1/001.png'
-	elif data_type == DataType.TAC.name:
-		filename_template = '{0}/Vall/mlsiemens_Herscovitch1985_plotScannerWholebrain_{1}{2}v{3}r1_{1}{2}v{3}r1.csv'
-	elif data_type == DataType.AIF.name:
-		plot_suffix = 'Caprac' if tracer == 'fdg' else 'Aif'
-		filename_template = '{0}/Vall/mlsiemens_Herscovitch1985_plot' + plot_suffix + '_{1}{2}v{3}r1_{1}{2}v{3}r1.csv'
-	elif data_type == DataType.TAC3D.name:
-		filename_template = '{0}/Vall/{1}{2}v{3}r1_sumt_on_fdg.4dfp.img'
-	elif data_type == DataType.TAC4D.name:
-		filename_template = '{0}/Vall/{1}{2}v{3}r1_op_{1}v1r1_on_op_fdgv1r1.4dfp.img'
+	id, tab = DATATYPES[data_type]
+	templates = next(filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'] == id and filepath['tab'] == tab)
+	return [ template.format(subject=subject, session=visit_id, dataset=tracer) for template in templates ] if templates else []
 
-	return filename_template.format(subject, tracer, tracer_match_suffix, visit_id) if filename_template else ''
-
-
-def get_data_for_filetype(filename):
-	full_path = os.path.join(app.config['PROJECT_FOLDER'], filename)
-	file_matches = glob(full_path)
+def get_data_for_filetype(filenames):
+	file_matches = [ item for filename in filenames for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ]
+	# full_path = os.path.join(app.config['PROJECT_FOLDER'], filename)
+	# file_matches = glob(full_path)
 	if all(f.endswith('.csv') for f in file_matches):
 		data = []
 		for f in file_matches:
@@ -114,14 +113,13 @@ def get_subject_data(data_type, tracer):
 		row['subject'] = subject
 		row['data'] = {}
 		for condition in condition_map.keys():
-			filename = get_filename(data_type, subject, condition, tracer)
-			file_data = get_data_for_filetype(filename)
+			filenames = get_filename(data_type, subject, condition, tracer)
+			file_data = get_data_for_filetype(filenames)
 			row['data'][condition] = file_data
 		row['data'] = dict(sorted(row['data'].items(), key=lambda x: x[0])) # sort conditions alphabetically ('basal', 'hygly', 'hyins')
 		if any(row['data'].values()):
 			rows.append(row)
 	return rows
-
 
 @app.route('/')
 @app.route('/<tracer>')
@@ -154,7 +152,6 @@ def tac_report(tracer, subject_id=None):
 		if img_type == 'TAC4D':
 			sample_4dimg = os.path.join(app.config['PROJECT_FOLDER'], data[tab][0]['data']['basal'][0])
 			max_slice, max_frame = nb.load(sample_4dimg).get_data().shape[2:]
-
 	return render_template('view-images.html', tracer=tracer, subject_id=subject_id, data=data, max_slice=max_slice, max_frame=max_frame,
 		slice=slice, frame=frame, max_length=max([len(v) for row in data['time-integral'] for v in row['data'].values() ]))
 
