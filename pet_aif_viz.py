@@ -11,7 +11,7 @@ import sys
 
 from datetime import datetime
 from enum import Enum
-from flask import Flask, render_template, request, send_file, send_from_directory
+from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
 from glob import glob
 from io import BytesIO
 from matplotlib import pyplot as plt
@@ -36,8 +36,10 @@ SUBJECT_ID = 'PET.Subject.Id'
 VISIT_ID = 'PET.Visit.Id'
 SESSION_DATE = 'Session.Date'
 
-with open('data/ppg_gen.json') as f:
+with open('data/ppg_gen2.json') as f:
 	data_config = json.load(f)
+
+default_ds = data_config['datasets'][0] # TODO: do we want to allow no dataset specification?
 
 app = Flask(__name__)
 app.config['PROJECT_FOLDER'] = data_config['project_folder']
@@ -90,7 +92,7 @@ def get_filename(data_type, subject, condition, tracer):
 	visit_id = subject_map[subject][condition]
 
 	id, tab = DATATYPES[data_type]
-	templates = next(filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'] == id and filepath['tab'] == tab)
+	templates = next((filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'] == id and filepath['tab'] == tab), None)
 	return [ template.format(subject=subject, session=visit_id, dataset=tracer) for template in templates ] if templates else []
 
 def get_data_for_filetype(filenames):
@@ -122,16 +124,32 @@ def get_subject_data(data_type, tracer):
 	return rows
 
 @app.route('/')
-@app.route('/<tracer>')
-@app.route('/<tracer>/<subject_id>')
-def fig_report(tracer='fdg', subject_id=None):
+def index(tracer=default_ds, subject=None):
+	rows = None
+	for type in DataType:
+		rows = get_subject_data(type.name, tracer) # find first datatype that has data (later on this will need to be view order dependent -- wont be able to rely on enum)
+		if rows:
+			break
+
+	if type == DataType.FIG:
+		return redirect(url_for('fig_report', subject=subject, tracer=tracer))
+	elif type in [DataType.TAC, DataType.AIF]:
+		return redirect(url_for('plot_report', subject=subject, tracer=tracer))
+	elif type in [DataType.TAC3D, DataType.TAC4D]:
+		return redirect(url_for('tac_report', subject=subject, tracer=tracer))
+	else: # rows should presumably be empty
+		abort(400)
+
+@app.route('/<tracer>/fig')
+@app.route('/<tracer>/<subject_id>/fig')
+def fig_report(tracer=default_ds, subject_id=None):
 	rows = get_subject_data(DataType.FIG.name, tracer)
 	return render_template('fig001.html', tracer=tracer, subject_id=subject_id, plotData=get_plotdata(tracer, subject_id), data=rows,
-		max_length=max([len(v) for row in rows for v in row['data'].values() ]))
+		max_length=max([len(v) for row in rows for v in row['data'].values() ], default=None))
 
 
-@app.route('/<tracer>/figdata')
-@app.route('/<tracer>/<subject_id>/figdata')
+@app.route('/<tracer>/tables')
+@app.route('/<tracer>/<subject_id>/tables')
 def plot_report(tracer, subject_id=None):
 	data = {}
 	for metric in [ 'TAC', 'AIF' ]:
@@ -140,8 +158,8 @@ def plot_report(tracer, subject_id=None):
 		max_length=max([len(v) for row in data['TAC'] for v in row['data'].values() ]))
 
 
-@app.route('/<tracer>/figdata/tac')
-@app.route('/<tracer>/<subject_id>/figdata/tac')
+@app.route('/<tracer>/tac')
+@app.route('/<tracer>/<subject_id>/tac')
 def tac_report(tracer, subject_id=None):
 	slice = request.args.get('slice')
 	frame = request.args.get('frame')
@@ -153,11 +171,11 @@ def tac_report(tracer, subject_id=None):
 			sample_4dimg = os.path.join(app.config['PROJECT_FOLDER'], data[tab][0]['data']['basal'][0])
 			max_slice, max_frame = nb.load(sample_4dimg).get_data().shape[2:]
 	return render_template('view-images.html', tracer=tracer, subject_id=subject_id, data=data, max_slice=max_slice, max_frame=max_frame,
-		slice=slice, frame=frame, max_length=max([len(v) for row in data['time-integral'] for v in row['data'].values() ]))
+		slice=slice, frame=frame, max_length=max([len(v) for row in data['time-integral'] for v in row['data'].values() ], default=None))
 
 
-@app.route('/<tracer>/figdata/aif')
-@app.route('/<tracer>/<subject_id>/figdata/aif')
+@app.route('/<tracer>/aif')
+@app.route('/<tracer>/<subject_id>/aif')
 def aif_report(tracer, subject_id=None):
 	return render_template('view-pdfs.html', tracer=tracer, subject_id=subject_id, subject_list=sorted(list(subject_map.keys())))
 
@@ -208,10 +226,11 @@ def show_pdf():
 
 @app.route('/figdata/plot', methods=['GET'])
 def gen_plot():
-	data_type = request.args.get('data_type')
+	data_type = request.args.get('data_type').upper()
 	subject = request.args.get('subject')
 	condition = request.args.get('condition')
 	tracer = request.args.get('tracer')
+	zoom = request.args.get('zoom')
 
 	fig = plt.figure()
 	ax1 = fig.add_subplot(111)
@@ -220,12 +239,20 @@ def gen_plot():
 	conditions = list(subject_map[subject].keys()) if condition == 'all' else [ condition ]
 	conditions.sort()
 	legend = []
+	zoom_range = None
+
 	for condition in conditions:
-		filenames = glob(os.path.join(app.config['PROJECT_FOLDER'], get_filename(data_type, subject, condition, tracer)))
+		filenames = [ item for filename in get_filename(data_type, subject, condition, tracer) \
+			for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ]
+
+		# filenames = glob(os.path.join(app.config['PROJECT_FOLDER'], ))
 		for filename in filenames:
 			x, y = np.genfromtxt(filename, delimiter=',', skip_header=1, unpack=True)
 			ax1.plot(x,y)
-			ax2.plot(x[:14], y[:14]) # create zoomed in plot of first 120 seconds
+
+			if zoom_range is None:
+				zoom_range = ceil(.05 * len(x)) # TODO: switch to point where interval of time changes (if no change, no zoom)
+			ax2.plot(x[:zoom_range], y[:zoom_range]) # create zoomed in plot of first 120 seconds
 
 			run = re.search('_([a-z]+(\d?))v\dr\d.csv$', filename).groups()[-1]
 			legend.append(condition + ('-' + run if run else ''))
@@ -235,7 +262,7 @@ def gen_plot():
 	ax1.set_ylabel('Specific activity')
 	ax1.legend(legend)
 
-	if tracer != 'fdg':
+	if not zoom:
 		fig.delaxes(ax2) # only need zoomed in plot for long timecourses
 
 	plot = BytesIO()
