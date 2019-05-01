@@ -1,0 +1,69 @@
+{% extends 'layout.html' %}
+
+{% block layout_content %}
+
+{% if tab is undefined %}
+    {% set tab = conf.tabs[0] %}
+{% endif %}
+{% set anchor = shared.get_anchor(tab) %}
+
+{% include 'nav.html' %}
+
+<div class='row'>
+    <div class='col-md-8'>
+        <canvas id='masterGraph'></canvas>
+    </div>
+</div>
+
+<script>
+    var data = JSON.parse('{{ data | tojson | safe }}');
+    var scatterData = JSON.parse('{{ plotData | tojson | safe }}');
+
+    var ctx = document.getElementById('masterGraph').getContext('2d');
+    var masterGraph = Chart.Scatter(ctx, {
+        data: scatterData,
+        options: {
+            animation: false,
+            legend: {
+                position: 'right'
+            },
+            scales: {
+                xAxes: [{
+                    scaleLabel: { display: true, labelString: 'AIF Counts', exponent: true },
+                    ticks: {
+                        callback: function(label, index, labels) {
+                            return label.toExponential(1);
+                        }
+                    }
+                }],
+                yAxes: [{
+                    scaleLabel: { display: true, labelString: 'PET activity', exponent: true },
+                    ticks: {
+                        callback: function(label, index, labels) {
+                            return label.toExponential(1);
+                        }
+                    }
+                }]
+            },
+            tooltips: {
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                        return point.subject + ': ' + tooltipItem.xLabel.toExponential(1) + ', ' + tooltipItem.yLabel.toExponential(1);
+                    }
+                }
+            }
+        }
+    });
+
+    document.getElementById('masterGraph').onclick = function(evt) {
+        var point = masterGraph.getElementAtEvent(evt)[0]
+        if (point) {
+            var pointData = scatterData.datasets[point._datasetIndex].data[point._index];
+            var tracer = '{{tracer}}';
+            window.location.replace('{{ url_for('graph_report', tracer=tracer, view_id=view_id) }}/' + pointData.subject)
+        }
+    };
+</script>
+
+{% endblock layout_content %}

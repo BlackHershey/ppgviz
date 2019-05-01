@@ -1,0 +1,23 @@
+<div class='row'>
+    <div class='nav-form btn-group' role='group'>
+        {% if subject_id %}
+            {% set target = url_for(route, tracer=tracer, view_id=view_id, subject_id=None, _anchor=anchor|trim if anchor else None) %}
+            <a class='btn btn-outline-secondary nav-button' href='{{ target }}'>Clear subject filter</a>
+        {% endif %}
+        <div class='dropdown'>
+            <a class='btn btn-secondary nav-button dropdown-toggle' href='#' role='button' id='select-ds' data-toggle='dropdown'>
+                Select dataset
+            </a>
+            <div class='dropdown-menu'>
+                {% for tracer in datasets %}
+                    <a class='dropdown-item' href='{{ url_for(route, tracer=tracer, subject_id=subject_id, view_id=view_id) }}'>{{tracer}}</a>
+                {% endfor %}
+            </div>
+        </div>
+        {% if tab.next %}
+            {% set next = view_config[tab.next] %}
+            {% set target = next.type.lower() + '_report' %}
+            <a class='btn btn-primary nav-button' href='{{ url_for(target, tracer=tracer, view_id=tab.next, subject_id=subject_id) }}'>View {{ tab.next }}</a>
+        {% endif %}
+    </div>
+</div>

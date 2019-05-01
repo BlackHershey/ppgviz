@@ -22,6 +22,7 @@ class DataType(Enum):
 	FIG = 1
 	TABLE = 2
 	IMG = 3
+	GRAPH = 4
 
 SUBJECT_ID = 'PET.Subject.Id'
 VISIT_ID = 'PET.Visit.Id'
@@ -88,7 +89,7 @@ def get_filename(view_id, tab, subject, condition, tracer):
 
 	templates = next((filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'].lower() == view_id.lower() \
 	 	and (filepath['tab'] is None or filepath['tab'].lower() == tab.lower())), None)
-	return [ template.format(subject=subject, session=visit_id, dataset=tracer) for template in templates ] if templates else []
+	return [ template.replace('{subject}', str(subject)).replace('{session}', str(visit_id)).replace('{dataset}', str(tracer)) for template in templates ] if templates else []
 
 
 def get_data_for_filetype(filenames):
@@ -128,13 +129,6 @@ def inject_config():
     return dict(view_config=view_config, datasets=data_config['datasets'])
 
 
-# @app.context_processor
-# def inject_plotdata():
-# 	def plotdata(tracer, subject):
-# 		return get_plotdata(tracer, subject_id)
-# 	return dict(plotData=plotdata)
-#
-
 @app.route('/')
 def index(tracer=default_ds, subject=None):
 	rows = None
@@ -148,6 +142,17 @@ def index(tracer=default_ds, subject=None):
 
 	 # if no return statement by this point, rows is empty -- abort
 	abort(400)
+
+
+@app.route('/<tracer>/graph/<view_id>')
+@app.route('/<tracer>/graph/<view_id>/<subject_id>')
+def graph_report(tracer, view_id, subject_id=None):
+	data = {}
+	for tab in view_config[view_id]['tabs']:
+		data[tab['name']] = ['static/{}_auc.json'.format(tracer)]
+
+	return render_template('graph_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id,
+		data=data, plotData=get_plotdata(tracer, subject_id))
 
 
 @app.route('/<tracer>/fig/<view_id>')

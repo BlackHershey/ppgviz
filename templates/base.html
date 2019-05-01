@@ -16,6 +16,7 @@
         <div id='content'>
             {% import '_shared.html' as shared with context %}
             {% set conf = view_config[view_id] %}
+            {% set route = request.url_rule.endpoint %}
 
             <!-- breadcrumbs -->
             <div class='row'>
@@ -31,34 +32,10 @@
                 </div>
             </div>
 
-            <div class='col-md-3 header'>
+            <div class='col-md-4 header'>
                 <h1> {{ view_id}} - {{ tracer.upper() }} </h1>
             </div>
 
-            {% if plotData %}
-            <div id='accordion' class='pb-3'>
-                <div class='card'>
-                    <div class='card-header'>
-                        <button class="btn btn-link" data-toggle="collapse" data-target="#groupPlot">
-                          Group comparison
-                        </button>
-                    </div>
-                    <div id="groupPlot" class="collapse show" data-parent="#accordion">
-                        <div class="card-body">
-                            <div class='container'>
-                                <div class='row'>
-                                    <div class='col-md-2'></div>
-                                    <div class='col-md-8'>
-                                        <canvas id='masterGraph'></canvas>
-                                    </div>
-                                    <div class='col-md-2'></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
             {% block content %}
             {% block layout_content scoped %}{% endblock layout_content %}
@@ -90,55 +67,6 @@
             window.location.hash = e.target.hash;
         })
 
-        /* masterGraph code */
 
-        var data = JSON.parse('{{ data | tojson | safe }}');
-        var scatterData = JSON.parse('{{ plotData | tojson | safe }}');
-
-        var ctx = document.getElementById('masterGraph').getContext('2d');
-        var masterGraph = Chart.Scatter(ctx, {
-            data: scatterData,
-            options: {
-                animation: false,
-                legend: {
-                    position: 'right'
-                },
-                scales: {
-                    xAxes: [{
-                        scaleLabel: { display: true, labelString: 'AIF Counts', exponent: true },
-                        ticks: {
-                            callback: function(label, index, labels) {
-                                return label.toExponential(1);
-                            }
-                        }
-                    }],
-                    yAxes: [{
-                        scaleLabel: { display: true, labelString: 'PET activity', exponent: true },
-                        ticks: {
-                            callback: function(label, index, labels) {
-                                return label.toExponential(1);
-                            }
-                        }
-                    }]
-                },
-                tooltips: {
-                    callbacks: {
-                        label: function(tooltipItem, data) {
-                            var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-                            return point.subject + ': ' + tooltipItem.xLabel.toExponential(1) + ', ' + tooltipItem.yLabel.toExponential(1);
-                        }
-                    }
-                }
-            }
-        });
-
-        document.getElementById('masterGraph').onclick = function(evt) {
-            var point = masterGraph.getElementAtEvent(evt)[0]
-            if (point) {
-                var pointData = scatterData.datasets[point._datasetIndex].data[point._index];
-                var tracer = '{{tracer}}';
-                window.location.replace('{{ url_for('fig_report', tracer=tracer, view_id=view_id) }}/' + pointData.subject)
-            }
-        };
     </script>
 </body>
