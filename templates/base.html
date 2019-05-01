@@ -10,16 +10,61 @@
 
 <body>
 
-    <title>PPG QA</title>
+    <title>NIdive</title>
 
     <div class='grid-container'>
         <div id='content'>
-            {% import '_shared.html' as shared %}
-            {% block content %}{% endblock %}
+            {% import '_shared.html' as shared with context %}
+            {% set conf = view_config[view_id] %}
+
+            <!-- breadcrumbs -->
+            <div class='row'>
+                <div class='col-md-12'>
+                    <nav class='breadcrumb'>
+                        {% set prev_views = view_config[view_id]['prev'] %}
+                        {% for view in prev_views %}
+                            {% set target = view_config[view]['type'].lower() + '_report' %}
+                            <a class='breadcrumb-item' href='{{ url_for(target, tracer=tracer, view_id=view, subject_id=subject_id) }}'>{{view}}</a>
+                        {% endfor %}
+                      <span class='breadcrumb-item active'>{{view_id}}</span>
+                    </nav>
+                </div>
+            </div>
+
+            <div class='col-md-3 header'>
+                <h1> {{ view_id}} - {{ tracer.upper() }} </h1>
+            </div>
+
+            {% if plotData %}
+            <div id='accordion' class='pb-3'>
+                <div class='card'>
+                    <div class='card-header'>
+                        <button class="btn btn-link" data-toggle="collapse" data-target="#groupPlot">
+                          Group comparison
+                        </button>
+                    </div>
+                    <div id="groupPlot" class="collapse show" data-parent="#accordion">
+                        <div class="card-body">
+                            <div class='container'>
+                                <div class='row'>
+                                    <div class='col-md-2'></div>
+                                    <div class='col-md-8'>
+                                        <canvas id='masterGraph'></canvas>
+                                    </div>
+                                    <div class='col-md-2'></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% block content %}
+            {% block layout_content scoped %}{% endblock layout_content %}
+            {% endblock content %}
+
         </div>
-        <footer>
-            <p><b>Note:</b> Subject/visit mapping data sourced from <a href='https://wustl.app.box.com/file/309074864947' target='_new'>ppg_id_map.xlsx</a> (v17).</p>
-        </footer>
     </div>
 
     <script>
@@ -32,6 +77,7 @@
             })
         });
         /* Code for updating url to reflect current tab (from: https://stackoverflow.com/a/9393768) */
+
         // Javascript to enable link to tab
         var url = document.location.toString();
         if (url.match('#')) {
@@ -43,5 +89,56 @@
         $('.nav-tabs a').on('shown.bs.tab', function (e) {
             window.location.hash = e.target.hash;
         })
+
+        /* masterGraph code */
+
+        var data = JSON.parse('{{ data | tojson | safe }}');
+        var scatterData = JSON.parse('{{ plotData | tojson | safe }}');
+
+        var ctx = document.getElementById('masterGraph').getContext('2d');
+        var masterGraph = Chart.Scatter(ctx, {
+            data: scatterData,
+            options: {
+                animation: false,
+                legend: {
+                    position: 'right'
+                },
+                scales: {
+                    xAxes: [{
+                        scaleLabel: { display: true, labelString: 'AIF Counts', exponent: true },
+                        ticks: {
+                            callback: function(label, index, labels) {
+                                return label.toExponential(1);
+                            }
+                        }
+                    }],
+                    yAxes: [{
+                        scaleLabel: { display: true, labelString: 'PET activity', exponent: true },
+                        ticks: {
+                            callback: function(label, index, labels) {
+                                return label.toExponential(1);
+                            }
+                        }
+                    }]
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            var point = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+                            return point.subject + ': ' + tooltipItem.xLabel.toExponential(1) + ', ' + tooltipItem.yLabel.toExponential(1);
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('masterGraph').onclick = function(evt) {
+            var point = masterGraph.getElementAtEvent(evt)[0]
+            if (point) {
+                var pointData = scatterData.datasets[point._datasetIndex].data[point._index];
+                var tracer = '{{tracer}}';
+                window.location.replace('{{ url_for('fig_report', tracer=tracer, view_id=view_id) }}/' + pointData.subject)
+            }
+        };
     </script>
 </body>

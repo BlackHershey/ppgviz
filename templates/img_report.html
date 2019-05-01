@@ -1,0 +1,44 @@
+{% extends 'display_content.html' %}
+
+{% block form_content %}
+<form id='img-form'>
+    <div class='form-group'>
+
+    {% set start_slice = slice if slice else max_slice // 2 %}
+
+    {% if dims[tab.name] > 2 %}
+    <div class='form-row'>
+        <div class='col-auto'>
+            <label for='slice-counter' class='control-label'>Slice #</label>
+        </div>
+        <div class='col-auto'>
+            <input type='range' class='form-control-range' id='{{prefix}}-slice-counter' name='slice'
+                min='1' max='{{max_slice}}' value='{{start_slice}}' onchange='updateSlice("{{tab.name}}", "{{prefix}}", this.value)'/>
+        </div>
+        <label class='control-label col-sm-1' id='{{prefix}}-current-slice' name='{{prefix}}-current-slice'>{{ start_slice }}</label>
+    </div>
+    {% endif %}
+
+    {% if dims[tab.name] > 3 %}
+        {% set start_frame = frame if frame else 1 %}
+        <div class='form-row'>
+            <div class='col-auto'>
+                <label for='frame-counter' class='control-label'>Frame #</label>
+            </div>
+            <div class='col-auto'>
+                <input type='range' class='form-control-range' id='{{prefix}}-frame-counter' name='frame'
+                    min='1' max='{{max_frame}}' value='{{start_frame}}' onchange='updateFrame("{{tab.name}}", "{{prefix}}", this.value)'/>
+            </div>
+            <label class='control-label col-sm-1' id='{{prefix}}-current-frame' name='current-frame'>{{ start_frame }}</label>
+        </div>
+    {% endif %}
+    </div>
+</form>
+{% endblock form_content %}
+
+{% block tab_content %}
+<img class='img-fluid horiz-align'
+    id='{{prefix}}_{{row.subject}}_{{condition}}{{i}}'
+    src='{{ url_for('access_slice', filename=item, slice=slice, frame=frame) }}'
+    data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
+{% endblock tab_content %}

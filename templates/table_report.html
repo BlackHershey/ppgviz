@@ -1,0 +1,51 @@
+{% extends 'display_content.html' %}
+
+{% block form_content %}
+<form id='plot-form' method='get' target='_new' action='{{ url_for('gen_plot') }}'>
+    <div class='form-group'>
+        <div class='form-row'>
+            <input type='hidden' name='view_id' value='{{view_id}}' />
+            <input type='hidden' name='data_type' value='{{tab.name}}' />
+            <input type='hidden' name='tracer' value='{{tracer}}' />
+
+            <div class='col-auto'>
+                <label for='condition' class='control-label'>Condition:</label>
+            </div>
+            <div class='col-auto'>
+                <select name='condition' id='cond-select' class='form-control' label='Condition'>
+                    {% for condition in ['all', 'basal', 'hypergly', 'hyperins'] %}
+                    <option value='{{condition}}'>{{condition}}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if subject_id %}
+                <input type='hidden' name='subject' value='{{subject_id}}' />
+            {% else %}
+                <div class='col-auto'>
+                    <label for='subject' class='control-label'>Subject:</label>
+                </div>
+                <div class='col-auto'>
+                    <select name='subject' id='sub-select' class='form-control'>
+                        {% for row in data[tab.name] | sort(attribute='subject') %}
+                        <option value='{{row.subject}}'>{{row.subject}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+    	</div>
+    	<div class='form-row'>
+            <div class='col-auto'>
+                <input type='submit' class='btn btn-primary' id='plot-btn' value='Plot'/>
+            </div>
+        </div>
+    </div>
+</form>
+<br/>
+{% endblock form_content %}
+
+
+{% block tab_content %}
+<div class='bodycontainer scrollable' data-toggle='popover' data-placement='top' data-content='{{ item.source }}'>
+    {{ item.table_html | safe }}
+</div>
+{% endblock tab_content %}

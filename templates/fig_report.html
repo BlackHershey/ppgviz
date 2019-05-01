@@ -1,0 +1,6 @@
+{% extends 'display_content.html' %}
+
+{% block tab_content %}
+<img class='img-fluid' src='{{ url_for('access_file', filename=item) }}'
+    data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
+{% endblock tab_content %}

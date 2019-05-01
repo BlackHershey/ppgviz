@@ -1,3 +1,4 @@
+import itertools
 import json
 import matplotlib
 matplotlib.use('Agg') # helps with webserver issues (https://stackoverflow.com/a/29172195)
@@ -19,27 +20,21 @@ from pet_aif_auc import pet_aif_auc
 
 class DataType(Enum):
 	FIG = 1
-	TAC = 2
-	AIF = 3
-	TAC3D = 4
-	TAC4D = 5
-
-DATATYPES = {
-	"FIG": ("Combined Plots", None),
-	"TAC": ("Data tables", "TAC"),
-	"AIF": ("Data tables", "AIF"),
-	"TAC3D": ("PET Images", "Time integral"),
-	"TAC4D": ("PET Images", "Time series")
-}
+	TABLE = 2
+	IMG = 3
 
 SUBJECT_ID = 'PET.Subject.Id'
 VISIT_ID = 'PET.Visit.Id'
 SESSION_DATE = 'Session.Date'
 
-with open('data/ppg_gen2.json') as f:
+with open('data/ppg_gen.json') as f:
 	data_config = json.load(f)
 
+with open('data/pet_view_conf.json') as f:
+	view_config = json.load(f)
+
 default_ds = data_config['datasets'][0] # TODO: do we want to allow no dataset specification?
+
 
 app = Flask(__name__)
 app.config['PROJECT_FOLDER'] = data_config['project_folder']
@@ -85,20 +80,19 @@ def get_plotdata(tracer, subject_id=None):
 			'data': datapoints
 		}
 		plotData['datasets'].append(dataset)
-	return plotData
+	return plotData if plotData['datasets'] else None
 
 
-def get_filename(data_type, subject, condition, tracer):
+def get_filename(view_id, tab, subject, condition, tracer):
 	visit_id = subject_map[subject][condition]
 
-	id, tab = DATATYPES[data_type]
-	templates = next((filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'] == id and filepath['tab'] == tab), None)
+	templates = next((filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'].lower() == view_id.lower() \
+	 	and (filepath['tab'] is None or filepath['tab'].lower() == tab.lower())), None)
 	return [ template.format(subject=subject, session=visit_id, dataset=tracer) for template in templates ] if templates else []
+
 
 def get_data_for_filetype(filenames):
 	file_matches = [ item for filename in filenames for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ]
-	# full_path = os.path.join(app.config['PROJECT_FOLDER'], filename)
-	# file_matches = glob(full_path)
 	if all(f.endswith('.csv') for f in file_matches):
 		data = []
 		for f in file_matches:
@@ -108,14 +102,15 @@ def get_data_for_filetype(filenames):
 	else:
 		return [ os.path.relpath(f, app.config['PROJECT_FOLDER']) for f in file_matches ]
 
-def get_subject_data(data_type, tracer):
+
+def get_subject_data(view_id, tab, tracer):
 	rows = []
 	for subject, condition_map in subject_map.items():
 		row = {}
 		row['subject'] = subject
 		row['data'] = {}
 		for condition in condition_map.keys():
-			filenames = get_filename(data_type, subject, condition, tracer)
+			filenames = get_filename(view_id, tab, subject, condition, tracer)
 			file_data = get_data_for_filetype(filenames)
 			row['data'][condition] = file_data
 		row['data'] = dict(sorted(row['data'].items(), key=lambda x: x[0])) # sort conditions alphabetically ('basal', 'hygly', 'hyins')
@@ -123,61 +118,83 @@ def get_subject_data(data_type, tracer):
 			rows.append(row)
 	return rows
 
+
+def get_maxlength(data, tabname):
+	return max([len(v) for row in data[tabname] for v in row['data'].values() ], default=None)
+
+
+@app.context_processor
+def inject_config():
+    return dict(view_config=view_config, datasets=data_config['datasets'])
+
+
+# @app.context_processor
+# def inject_plotdata():
+# 	def plotdata(tracer, subject):
+# 		return get_plotdata(tracer, subject_id)
+# 	return dict(plotData=plotdata)
+#
+
 @app.route('/')
 def index(tracer=default_ds, subject=None):
 	rows = None
-	for type in DataType:
-		rows = get_subject_data(type.name, tracer) # find first datatype that has data (later on this will need to be view order dependent -- wont be able to rely on enum)
-		if rows:
-			break
+	for id, conf in view_config.items():
+		print(id)
+		for tab in conf['tabs']:
+			rows = get_subject_data(id, tab['name'], tracer) # find first datatype that has data (later on this will need to be view order dependent -- wont be able to rely on enum)
+			if rows:
+				type = conf['type'].lower()
+				return redirect(url_for('{}_report'.format(type), subject=subject, tracer=tracer, view_id=id))
 
-	if type == DataType.FIG:
-		return redirect(url_for('fig_report', subject=subject, tracer=tracer))
-	elif type in [DataType.TAC, DataType.AIF]:
-		return redirect(url_for('plot_report', subject=subject, tracer=tracer))
-	elif type in [DataType.TAC3D, DataType.TAC4D]:
-		return redirect(url_for('tac_report', subject=subject, tracer=tracer))
-	else: # rows should presumably be empty
-		abort(400)
-
-@app.route('/<tracer>/fig')
-@app.route('/<tracer>/<subject_id>/fig')
-def fig_report(tracer=default_ds, subject_id=None):
-	rows = get_subject_data(DataType.FIG.name, tracer)
-	return render_template('fig001.html', tracer=tracer, subject_id=subject_id, plotData=get_plotdata(tracer, subject_id), data=rows,
-		max_length=max([len(v) for row in rows for v in row['data'].values() ], default=None))
+	 # if no return statement by this point, rows is empty -- abort
+	abort(400)
 
 
-@app.route('/<tracer>/tables')
-@app.route('/<tracer>/<subject_id>/tables')
-def plot_report(tracer, subject_id=None):
+@app.route('/<tracer>/fig/<view_id>')
+@app.route('/<tracer>/fig/<view_id>/<subject_id>')
+def fig_report(tracer, view_id, subject_id=None):
 	data = {}
-	for metric in [ 'TAC', 'AIF' ]:
-		data[metric] = get_subject_data(DataType[metric].name, tracer)
-	return render_template('plot-tables.html', tracer=tracer, subject_id=subject_id, data=data,
-		max_length=max([len(v) for row in data['TAC'] for v in row['data'].values() ]))
+	for tab in view_config[view_id]['tabs']:
+		data[tab['name']] = get_subject_data(view_id, tab['name'], tracer)
+
+	return render_template('fig_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id,
+		data=data, plotData=get_plotdata(tracer, subject_id),
+		max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
 
 
-@app.route('/<tracer>/tac')
-@app.route('/<tracer>/<subject_id>/tac')
-def tac_report(tracer, subject_id=None):
+@app.route('/<tracer>/tables/<view_id>')
+@app.route('/<tracer>/tables/<view_id>/<subject_id>')
+def table_report(tracer, view_id, subject_id=None):
+	data = {}
+	for tab in view_config[view_id]['tabs']:
+		data[tab['name']] = get_subject_data(view_id, tab['name'], tracer)
+	return render_template('table_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id, data=data,
+		plotData=get_plotdata(tracer, subject_id), max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
+
+
+@app.route('/<tracer>/img/<view_id>')
+@app.route('/<tracer>/img/<view_id>/<subject_id>')
+def img_report(tracer, view_id, subject_id=None):
 	slice = request.args.get('slice')
 	frame = request.args.get('frame')
 
 	data = {}
-	for tab, img_type in [ ('time-integral', 'TAC3D'), ('time-series', 'TAC4D') ]:
-		data[tab] = get_subject_data(DataType[img_type].name, tracer)
-		if img_type == 'TAC4D':
-			sample_4dimg = os.path.join(app.config['PROJECT_FOLDER'], data[tab][0]['data']['basal'][0])
-			max_slice, max_frame = nb.load(sample_4dimg).get_data().shape[2:]
-	return render_template('view-images.html', tracer=tracer, subject_id=subject_id, data=data, max_slice=max_slice, max_frame=max_frame,
-		slice=slice, frame=frame, max_length=max([len(v) for row in data['time-integral'] for v in row['data'].values() ], default=None))
+	dims = {}
+	for tab in view_config[view_id]['tabs']:
+		data[tab['name']] = get_subject_data(view_id, tab['name'], tracer)
+		# figure out shape of images being shown in tab
+		sample_img_filename = os.path.join(app.config['PROJECT_FOLDER'], list(itertools.chain.from_iterable(data[tab['name']][0]['data'].values()))[0])
+		temp = nb.load(sample_img_filename).get_data()
+		if temp.shape[-1] == 1:
+			temp = np.reshape(temp, temp.shape[:-1])
+		dims[tab['name']] = len(temp.shape)
 
+		max_slice = temp.shape[2] if len(temp.shape) >= 3 else None
+		max_frame = temp.shape[3] if len(temp.shape) == 4 else None
 
-@app.route('/<tracer>/aif')
-@app.route('/<tracer>/<subject_id>/aif')
-def aif_report(tracer, subject_id=None):
-	return render_template('view-pdfs.html', tracer=tracer, subject_id=subject_id, subject_list=sorted(list(subject_map.keys())))
+	return render_template('img_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id, data=data, max_slice=max_slice,
+		plotData=get_plotdata(tracer, subject_id), max_frame=max_frame, slice=slice, frame=frame, dims=dims,
+		max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
 
 
 @app.route('/file/<path:filename>')
@@ -188,15 +205,18 @@ def access_file(filename):
 @app.route('/imshow/<path:filename>')
 def access_slice(filename):
 	imgdata = nb.load(os.path.join(app.config['PROJECT_FOLDER'], filename)).get_data()
-	slice = int(request.args.get('slice')) if request.args.get('slice') else imgdata.shape[2] // 2
-	frame = int(request.args.get('frame')) if request.args.get('frame') and imgdata.shape[3] > 1 else 1
 
-	# cap values at max values to prevent indexing errors
-	slice = min(slice, imgdata.shape[2])-1
-	frame = min(frame, imgdata.shape[3])-1
+	# imgdata could be 2, 3, or 4-dimensional -- only apply slice/frame selection where applicable
+	imgdata_mindim = np.reshape(imgdata, imgdata.shape[:-1]) if imgdata.shape[-1] == 1 else imgdata # reshape to min dimensions if extra dimension present (i.e. if 3D image has 40th dim of 1)
+	if len(imgdata_mindim.shape) > 2:
+		slice = int(request.args.get('slice')) if request.args.get('slice') else imgdata.shape[2] // 2
+		imgdata = np.take(imgdata, min(slice, imgdata.shape[2])-1, axis=2)
+	if len(imgdata_mindim.shape) > 3:
+		frame = int(request.args.get('frame')) if request.args.get('frame') else 1
+		imgdata = np.take(imgdata, min(frame, imgdata.shape[-1])-1, axis=len(imgdata.shape)-1)
 
-	outimg = np.expand_dims(imgdata[:, :, slice, frame], axis=2)
-	outimg = np.flip(outimg[:, :, -1], 1).T
+	outimg = np.reshape(imgdata, imgdata.shape[:2])
+	outimg = np.flip(outimg, 1).T
 
 	fig, ax = plt.subplots()
 	ax.imshow(outimg, cmap='gray')
@@ -208,25 +228,10 @@ def access_slice(filename):
 	return send_file(img, mimetype='image/png')
 
 
-@app.route('/pdfshow', methods=['GET'])
-def show_pdf():
-	subject = request.args.get('subject')
-	condition = request.args.get('condition')
-	visit_id = float(subject_map[subject][condition])
-
-	visit_date = df.loc[(df[SUBJECT_ID] == subject) & (df[VISIT_ID] == visit_id)].iloc[0]['Session.Date']
-
-	rad_files = glob(os.path.join(app.config['PROJECT_FOLDER'], 'CCIRRadMeasurements', 'CCIRRadMeasurements*.pdf'))
-	filemap = { datetime.strptime(re.search('CCIRRadMeasurements (\w*).pdf', filename).group(1), '%Y%b%d'): filename for filename in rad_files }
-
-
-	match = [ v for k,v in filemap.items() if pd.Timestamp(k) == visit_date ][0]
-	return send_file(match, mimetype='application/pdf')
-
-
 @app.route('/figdata/plot', methods=['GET'])
 def gen_plot():
-	data_type = request.args.get('data_type').upper()
+	view_id = request.args.get('view_id')
+	data_type = request.args.get('data_type')
 	subject = request.args.get('subject')
 	condition = request.args.get('condition')
 	tracer = request.args.get('tracer')
@@ -242,7 +247,7 @@ def gen_plot():
 	zoom_range = None
 
 	for condition in conditions:
-		filenames = [ item for filename in get_filename(data_type, subject, condition, tracer) \
+		filenames = [ item for filename in get_filename(view_id, data_type, subject, condition, tracer) \
 			for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ]
 
 		# filenames = glob(os.path.join(app.config['PROJECT_FOLDER'], ))
@@ -250,15 +255,13 @@ def gen_plot():
 			x, y = np.genfromtxt(filename, delimiter=',', skip_header=1, unpack=True)
 			ax1.plot(x,y)
 
-			if zoom_range is None:
-				zoom_range = ceil(.05 * len(x)) # TODO: switch to point where interval of time changes (if no change, no zoom)
-			ax2.plot(x[:zoom_range], y[:zoom_range]) # create zoomed in plot of first 120 seconds
+			ax2.plot(x[:14], y[:14]) # create zoomed in plot of first 120 seconds
 
 			run = re.search('_([a-z]+(\d?))v\dr\d.csv$', filename).groups()[-1]
 			legend.append(condition + ('-' + run if run else ''))
 
-	ax1.set_title('{} {} for {}'.format(tracer.upper(), data_type.upper(), subject))
-	ax1.set_xlabel('Time (s)')
+	ax1.set_title('{} {} for {}'.format(tracer.upper(), data_type, subject))
+	ax1.set_xlabel('Time (s)') # FIXME: source these axis labels from the data itself
 	ax1.set_ylabel('Specific activity')
 	ax1.legend(legend)
 
