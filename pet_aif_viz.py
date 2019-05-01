@@ -15,6 +15,7 @@ from enum import Enum
 from flask import Flask, abort, redirect, render_template, request, send_file, send_from_directory, url_for
 from glob import glob
 from io import BytesIO
+from matplotlib import cm
 from matplotlib import pyplot as plt
 from pet_aif_auc import pet_aif_auc
 
@@ -28,7 +29,7 @@ SUBJECT_ID = 'PET.Subject.Id'
 VISIT_ID = 'PET.Visit.Id'
 SESSION_DATE = 'Session.Date'
 
-with open('data/ppg_gen.json') as f:
+with open('data/ppg_data_conf.json') as f:
 	data_config = json.load(f)
 
 with open('data/pet_view_conf.json') as f:
@@ -57,44 +58,22 @@ def dim_color(rgb_str):
 
 
 # regenerate plotdata on each fig_report page load (needed to maintain "selected" subject styling)
-def get_plotdata(tracer, subject_id=None):
-	pet_aif_auc(app.config['PROJECT_FOLDER'], subject_map, tracer) # recalculate auc on program start (in case any underlying CSVs have changed)
+def get_plotdata(data, subject_id=None):
 
-	color_map = {
-		'red': 'rgb(255, 99, 132)',
-		'green': 'rgb(60, 179, 113)',
-		'blue': 'rgb(30, 144, 255)'
-	}
-	auc_df = pd.read_csv('static/{}_auc.csv'.format(tracer))
-	plotData = { 'datasets': [] }
-	for condition, color in [('basal', 'blue'), ('hypergly', 'red'), ('hyperins', 'green')]:
-		c_df = auc_df[auc_df.condition == condition]
-		c_df = c_df.rename(columns={'aif': 'x', 'pet': 'y'})
-		# hack: convert to json to get correct int serialization from df (to_dict will have numpy types that JS can't read)
-		#   but then, we need to read the json back to dict so JS can properly deserialize it
-		datapoints = json.loads(c_df.to_json(orient='records'))
-		dataset = {
-			'label': condition,
-			'backgroundColor': color_map[color], # set overall backgroundColor to set up legend colors
-			'pointBackgroundColor': [ color_map[color] if not subject_id or point['subject'] == subject_id else dim_color(color_map[color]) for point in datapoints ], #  dim points for non-selected subjects
-			'fill': 'false',
-			'data': datapoints
-		}
-		plotData['datasets'].append(dataset)
-	return plotData if plotData['datasets'] else None
+	return plotdata if not empty else None
 
 
 def get_filename(view_id, tab, subject, condition, tracer):
-	visit_id = subject_map[subject][condition]
+	visit_id = subject_map[subject][condition] if subject and condition else None
 
 	templates = next((filepath['templates'] for filepath in data_config['filepaths'] if filepath['id'].lower() == view_id.lower() \
 	 	and (filepath['tab'] is None or filepath['tab'].lower() == tab.lower())), None)
 	return [ template.replace('{subject}', str(subject)).replace('{session}', str(visit_id)).replace('{dataset}', str(tracer)) for template in templates ] if templates else []
 
 
-def get_data_for_filetype(filenames):
+def get_data_for_filetype(filenames, data_type):
 	file_matches = [ item for filename in filenames for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ]
-	if all(f.endswith('.csv') for f in file_matches):
+	if data_type.upper() == DataType.TABLE.name:
 		data = []
 		for f in file_matches:
 			table_html = pd.read_csv(f).to_html(index=False, justify='left').replace('<table border="1" class="dataframe">','<table class="table table-striped table-scrollable">')
@@ -112,7 +91,7 @@ def get_subject_data(view_id, tab, tracer):
 		row['data'] = {}
 		for condition in condition_map.keys():
 			filenames = get_filename(view_id, tab, subject, condition, tracer)
-			file_data = get_data_for_filetype(filenames)
+			file_data = get_data_for_filetype(filenames, view_config[view_id]['type'])
 			row['data'][condition] = file_data
 		row['data'] = dict(sorted(row['data'].items(), key=lambda x: x[0])) # sort conditions alphabetically ('basal', 'hygly', 'hyins')
 		if any(row['data'].values()):
@@ -148,11 +127,34 @@ def index(tracer=default_ds, subject=None):
 @app.route('/<tracer>/graph/<view_id>/<subject_id>')
 def graph_report(tracer, view_id, subject_id=None):
 	data = {}
-	for tab in view_config[view_id]['tabs']:
-		data[tab['name']] = ['static/{}_auc.json'.format(tracer)]
+	colors = [ tuple([x*255 for x in tup]) for tup in cm.tab10.colors ]
 
-	return render_template('graph_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id,
-		data=data, plotData=get_plotdata(tracer, subject_id))
+	for tab in view_config[view_id]['tabs']:
+		data[tab['name']] = { 'datasets': [] }
+
+		filename = [ item for filename in get_filename(view_id, tab, None, None, tracer) for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ][0]
+		graph_df = pd.read_csv(filename).dropna()
+		conditions = np.unique(graph_df['condition'].values)
+
+		for condition, color_tup in zip(conditions, colors):
+			c_df = graph_df[graph_df.condition == condition]
+			c_df = c_df.rename(columns={'aif': 'x', 'pet': 'y'})
+
+			color_str = 'rgb{}'.format(color_tup)
+
+			# hack: convert to json to get correct int serialization from df (to_dict will have numpy types that JS can't read)
+			#   but then, we need to read the json back to dict so JS can properly deserialize it
+			datapoints = json.loads(c_df.to_json(orient='records'))
+			dataset = {
+				'label': condition,
+				'backgroundColor': color_str, # set overall backgroundColor to set up legend colors
+				'pointBackgroundColor': [ color_str if not subject_id or point['subject'] == subject_id else dim_color(color_str) for point in datapoints ], #  dim points for non-selected subjects
+				'fill': 'false',
+				'data': datapoints
+			}
+			data[tab['name']]['datasets'].append(dataset)
+
+	return render_template('graph_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id, data=data)
 
 
 @app.route('/<tracer>/fig/<view_id>')
@@ -163,8 +165,7 @@ def fig_report(tracer, view_id, subject_id=None):
 		data[tab['name']] = get_subject_data(view_id, tab['name'], tracer)
 
 	return render_template('fig_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id,
-		data=data, plotData=get_plotdata(tracer, subject_id),
-		max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
+		data=data, max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
 
 
 @app.route('/<tracer>/tables/<view_id>')
@@ -174,7 +175,7 @@ def table_report(tracer, view_id, subject_id=None):
 	for tab in view_config[view_id]['tabs']:
 		data[tab['name']] = get_subject_data(view_id, tab['name'], tracer)
 	return render_template('table_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id, data=data,
-		plotData=get_plotdata(tracer, subject_id), max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
+		max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
 
 
 @app.route('/<tracer>/img/<view_id>')
@@ -198,8 +199,7 @@ def img_report(tracer, view_id, subject_id=None):
 		max_frame = temp.shape[3] if len(temp.shape) == 4 else None
 
 	return render_template('img_report.html', tracer=tracer, view_id=view_id, subject_id=subject_id, data=data, max_slice=max_slice,
-		plotData=get_plotdata(tracer, subject_id), max_frame=max_frame, slice=slice, frame=frame, dims=dims,
-		max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
+		max_frame=max_frame, slice=slice, frame=frame, dims=dims, max_length=get_maxlength(data, view_config[view_id]['tabs'][0]['name']))
 
 
 @app.route('/file/<path:filename>')

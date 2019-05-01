@@ -16,8 +16,8 @@
 </div>
 
 <script>
-    var data = JSON.parse('{{ data | tojson | safe }}');
-    var scatterData = JSON.parse('{{ plotData | tojson | safe }}');
+    var activeTab = $('.nav-tabs .active').text();
+    var scatterData = JSON.parse('{{ data | tojson | safe }}')[activeTab ? activeTab : "null"];
 
     var ctx = document.getElementById('masterGraph').getContext('2d');
     var masterGraph = Chart.Scatter(ctx, {
