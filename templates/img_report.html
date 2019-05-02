@@ -1,6 +1,7 @@
 {% extends 'display_content.html' %}
 
 {% block form_content %}
+
 <form id='img-form'>
     <div class='form-group'>
 
@@ -12,10 +13,10 @@
             <label for='slice-counter' class='control-label'>Slice #</label>
         </div>
         <div class='col-auto'>
-            <input type='range' class='form-control-range' id='{{prefix}}-slice-counter' name='slice'
-                min='1' max='{{max_slice}}' value='{{start_slice}}' onchange='updateSlice("{{tab.name}}", "{{prefix}}", this.value)'/>
+            <input type='range' class='form-control-range' id='{{anchor}}-slice-counter' name='slice'
+                min='1' max='{{max_slice}}' value='{{start_slice}}' onchange='updateSlice("{{tab.name}}", "{{anchor}}", this.value)'/>
         </div>
-        <label class='control-label col-sm-1' id='{{prefix}}-current-slice' name='{{prefix}}-current-slice'>{{ start_slice }}</label>
+        <label class='control-label col-sm-1' id='{{anchor}}-current-slice' name='{{anchor}}-current-slice'>{{ start_slice }}</label>
     </div>
     {% endif %}
 
@@ -26,19 +27,67 @@
                 <label for='frame-counter' class='control-label'>Frame #</label>
             </div>
             <div class='col-auto'>
-                <input type='range' class='form-control-range' id='{{prefix}}-frame-counter' name='frame'
-                    min='1' max='{{max_frame}}' value='{{start_frame}}' onchange='updateFrame("{{tab.name}}", "{{prefix}}", this.value)'/>
+                <input type='range' class='form-control-range' id='{{anchor}}-frame-counter' name='frame'
+                    min='1' max='{{max_frame}}' value='{{start_frame}}' onchange='updateFrame("{{tab.name}}", "{{anchor}}", this.value)'/>
             </div>
-            <label class='control-label col-sm-1' id='{{prefix}}-current-frame' name='current-frame'>{{ start_frame }}</label>
+            <label class='control-label col-sm-1' id='{{anchor}}-current-frame' name='current-frame'>{{ start_frame }}</label>
         </div>
     {% endif %}
     </div>
 </form>
+
+<script>
+    var data = JSON.parse('{{ data | tojson | safe }}');
+    var subject_id = '{{ subject_id if subject_id else '' }}';
+    var max_length = '{{ max_length }}';
+
+    function updateImages(tab_name, prefix) {
+        var slice_counter = document.getElementById(prefix + '-slice-counter');
+        var frame_counter = document.getElementById(prefix + '-frame-counter');
+
+        var slice = slice_counter != null ? 'slice=' + slice_counter.value : null;
+        var frame = frame_counter != null ? 'frame=' + frame_counter.value : null;
+
+        var params_str = [slice, frame].filter(Boolean).join('&')
+        console.log(params_str)
+
+        for (var i = 0; i < data[tab_name].length; i++) {
+            var row = data[tab_name][i];
+            if (subject_id != '' && subject_id != row.subject){
+                continue;
+            }
+            for (var j = 0; j < max_length; j++){
+                for (var prop in row.data) {
+                    var id = prefix + '_' + row.subject + '_' + prop + j;
+                    var img = document.getElementById(id);
+                    if (img != null) {
+                        console.log('updating image')
+                        base_url = '/imshow/' + row.data[prop][j]
+                        img.src =  [base_url, params_str].join('?')
+                    }
+                }
+            }
+        }
+    }
+
+    function updateSlice(tab_name, prefix, slice) {
+        console.log(prefix + '-current-slice');
+        document.getElementById(prefix + '-current-slice').innerHTML = slice;
+        updateImages(tab_name, prefix);
+    }
+
+    function updateFrame(tab_name, prefix, frame) {
+        document.getElementById(prefix + '-current-frame').innerHTML = frame;
+        updateImages(tab_name, prefix);
+    }
+
+</script>
+
 {% endblock form_content %}
 
 {% block tab_content %}
 <img class='img-fluid horiz-align'
-    id='{{prefix}}_{{row.subject}}_{{condition}}{{i}}'
+    id='{{anchor}}_{{row.subject}}_{{condition}}{{i}}'
     src='{{ url_for('access_slice', filename=item, slice=slice, frame=frame) }}'
     data-toggle='popover' data-placement='top' data-content='{{ item }}'/>
 {% endblock tab_content %}

@@ -5,7 +5,7 @@
 {% if tab is undefined %}
     {% set tab = conf.tabs[0] %}
 {% endif %}
-{% set anchor = shared.get_anchor(tab) %}
+{% set anchor = shared.get_anchor(tab)|trim %}
 
 {% include 'nav.html' %}
 
