@@ -12,7 +12,16 @@
 {% block form_content scoped %}{% endblock form_content %}
 <br/>
 
-{% include 'header.html' %}
+<div class='row'>
+    <div class='col-md-1 title'><h2>Subject</h2></div>
+    {% set colwidth = 11//(labels|length) %}
+    {% for label in labels %}
+    <div class='col-md-{{colwidth}} title'>
+        <h2>{{ label }}</h2>
+    </div>
+    {% endfor %}
+
+</div>
 
 {% for row in data[tab['name']] | sort(attribute='subject') %}
     {% if not subject_id or row.subject == subject_id %}
@@ -21,7 +30,7 @@
         <div class='row'>
             {{ shared.subject_link(route, i == 0, row.subject, anchor) }}
             {% for condition in row.data.keys() %}
-            <div class='col-md-3'>
+            <div class='col-md-{{ colwidth }}'>
                 {% set item = row.data[condition][i] %}
                 {% if item %}
                     {% block tab_content scoped %}{% endblock tab_content %}

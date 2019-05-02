@@ -25,6 +25,12 @@ def create_app(data_config_file, subject_map_file, view_config_file):
 		IMG = 3
 		GRAPH = 4
 
+	app = Flask(__name__)
+
+	SUBJECT_ID = 'subject'
+	VISIT_ID = 'session'
+	CONDITION = 'label'
+
 	with open(data_config_file) as f:
 		data_config = json.load(f)
 
@@ -33,16 +39,10 @@ def create_app(data_config_file, subject_map_file, view_config_file):
 
 	default_ds = data_config['datasets'][0] # TODO: do we want to allow no dataset specification?
 
-
-	app = Flask(__name__)
 	app.config['PROJECT_FOLDER'] = data_config['project_folder']
 
 	df = pd.read_csv(subject_map_file).dropna().drop_duplicates()
-	# df = df.loc[df.groupby([SUBJECT_ID, 'Condition'])[VISIT_ID].idxmin()]
-
-	SUBJECT_ID = 'subject'
-	VISIT_ID = 'session'
-	CONDITION = 'label'
+	labels = np.unique(df[CONDITION].values)
 
 	subject_map = {}
 	for index, row in df.iterrows():
@@ -97,7 +97,7 @@ def create_app(data_config_file, subject_map_file, view_config_file):
 
 	@app.context_processor
 	def inject_config():
-	    return dict(view_config=view_config, datasets=data_config['datasets'])
+	    return dict(view_config=view_config, datasets=data_config['datasets'], labels=labels)
 
 
 	@app.route('/')
@@ -126,9 +126,8 @@ def create_app(data_config_file, subject_map_file, view_config_file):
 
 			filename = [ item for filename in get_filename(view_id, tab, None, None, tracer) for item in glob(os.path.join(app.config['PROJECT_FOLDER'], filename)) ][0]
 			graph_df = pd.read_csv(filename).dropna()
-			conditions = np.unique(graph_df['condition'].values)
 
-			for condition, color_tup in zip(conditions, colors):
+			for condition, color_tup in zip(labels, colors):
 				c_df = graph_df[graph_df.condition == condition]
 				c_df = c_df.rename(columns={'aif': 'x', 'pet': 'y'})
 
