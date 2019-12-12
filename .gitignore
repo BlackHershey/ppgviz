@@ -1,5 +1,4 @@
 .virtualenvs/*
 __pycache__/*
-static/*
-!static/*.css
 *.sh
+data/

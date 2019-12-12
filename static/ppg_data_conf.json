@@ -1,7 +1,14 @@
 {
-    "project_folder": "P:\\",
+    "project_folder": "/data/nil-bluearc/raichle/PPGdata/jjlee2",
     "datasets": [ "fdg", "oo", "oc", "ho" ],
     "filepaths": [
+        {
+            "id": "Group Comparison",
+            "tab": null,
+            "templates": [
+                "ppgviz/static/{dataset}_auc.csv"
+            ]
+        },
         {
             "id": "Combined Plots",
             "tab": null,
@@ -10,14 +17,14 @@
             ]
         },
         {
-            "id": "Data tables",
+            "id": "Data Tables",
             "tab": "TAC",
             "templates": [
                 "{subject}/Vall/mlsiemens_Herscovitch1985_plotScannerWholebrain_{dataset}*v{session}r1_{dataset}*v{session}r1.csv"
             ]
         },
         {
-            "id": "Data tables",
+            "id": "Data Tables",
             "tab": "AIF",
             "templates": [
                 "{subject}/Vall/mlsiemens_Herscovitch1985_plotCaprac_{dataset}*v{session}r1_{dataset}*v{session}r1.csv",

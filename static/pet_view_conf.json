@@ -1,0 +1,50 @@
+{
+    "Group Comparison": {
+        "type": "GRAPH",
+        "prev": [],
+        "tabs": [
+            {
+                "name": null,
+                "next": "Combined Plots"
+            }
+        ]
+    },
+    "Combined Plots": {
+       "type": "FIG",
+       "prev": ["Group Comparison"],
+       "tabs": [
+           {
+               "name": null,
+               "next": "Data Tables"
+           }
+       ]
+   },
+   "Data Tables": {
+       "type": "TABLE",
+       "prev": ["Group Comparison", "Combined Plots"],
+       "tabs": [
+           {
+               "name": "TAC",
+               "next": "PET Images"
+           },
+           {
+               "name": "AIF",
+               "next": null
+           }
+       ]
+   },
+   "PET Images": {
+       "type": "IMG",
+       "prev": ["Group Comparison", "Combined Plots", "Data Tables"],
+       "tabs": [
+           {
+               "name": "Time integral",
+               "next": null
+           },
+           {
+               "name": "Time series",
+               "next": null
+           }
+       ]
+   }
+}

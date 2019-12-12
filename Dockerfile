@@ -9,6 +9,6 @@ RUN pip install -r /app/requirements.txt
 COPY . /app
 
 
-CMD ["python", "pet_aif_viz.py"]
+ENTRYPOINT ["python", "pet_aif_viz.py"]
 
 

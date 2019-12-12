@@ -116,7 +116,7 @@ def create_app(data_config_file, subject_map_file, view_config_file):
 		rows = None
 		for id, conf in view_config.items():
 			for tab in conf['tabs']:
-				rows = get_subject_data(id, tab['name'], tracer) # find first datatype that has data (later on this will need to be view order dependent -- wont be able to rely on enum)
+				rows = get_subject_data(subject_map, data_config, view_config, id, tab['name'], tracer) # find first datatype that has data (later on this will need to be view order dependent -- wont be able to rely on enum)
 				if rows:
 					type = conf['type'].lower()
 					return redirect(url_for('{}_report'.format(type), subject=subject, tracer=tracer, view_id=id))
